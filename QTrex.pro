@@ -1,3 +1,5 @@
+QT += core gui
+QT += widgets
 OTHER_FILES += 
 HEADERS += mainwnd.h \
     qgameboard.h

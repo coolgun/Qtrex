@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'mainwnd.ui'
 **
-** Created by: Qt User Interface Compiler version 5.12.0
+** Created by: Qt User Interface Compiler version 5.15.2
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
@@ -150,12 +150,12 @@ public:
 
     void retranslateUi(QWidget *MainWnd)
     {
-        MainWnd->setWindowTitle(QApplication::translate("MainWnd", "Qtrex", nullptr));
-        btnStart->setText(QApplication::translate("MainWnd", "New Game", nullptr));
-        btnPause->setText(QApplication::translate("MainWnd", "Pause", nullptr));
-        btnQuit->setText(QApplication::translate("MainWnd", "Quit", nullptr));
-        label->setText(QApplication::translate("MainWnd", "Level", nullptr));
-        label_2->setText(QApplication::translate("MainWnd", "Scores", nullptr));
+        MainWnd->setWindowTitle(QCoreApplication::translate("MainWnd", "Qtrex", nullptr));
+        btnStart->setText(QCoreApplication::translate("MainWnd", "New Game", nullptr));
+        btnPause->setText(QCoreApplication::translate("MainWnd", "Pause", nullptr));
+        btnQuit->setText(QCoreApplication::translate("MainWnd", "Quit", nullptr));
+        label->setText(QCoreApplication::translate("MainWnd", "Level", nullptr));
+        label_2->setText(QCoreApplication::translate("MainWnd", "Scores", nullptr));
     } // retranslateUi
 
 };

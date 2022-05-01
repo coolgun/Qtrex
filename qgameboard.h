@@ -2,11 +2,11 @@
 #define QGAMEBOARD_H
 
 #include <QtWidgets/QFrame>
+#include <QPainterPath>
 #include <array>
 #include <math.h>
 
 using FigureCoord = std::array<std::array<bool, 4>, 4>;
-
 
 enum
 {
@@ -15,14 +15,11 @@ enum
 	kColCount = 1 << kPartCount
 };
 
-const qreal	coeff=5.0;
-
 class GameField;
 class Figure ; 
 
 class GameDrawer	
 {
-
 		qreal MaxRadius{};
         qreal MinRadius{};
 		std::array<QPoint, kColCount * 2>   lines;
@@ -54,16 +51,11 @@ class GameField: public QObject
 		int scores{};
 		int level{};
 
-		void  SetCell(const QPoint &cell_coord,const QColor &color);
-
+		void SetCell(const QPoint &cell_coord,const QColor &color);
 		void CheckAll();
-		
-		bool  CheckLine(int y) const;
-		
+		bool CheckLine(int y) const;
 		void RemoveLine(int line);
-
         void setScores(int new_scores);
-
         void setLevel(int new_level);
 	
 		
@@ -107,10 +99,7 @@ class FigureProducer : public QObject
 		mutable size_t m_next_figure_color;
 		mutable size_t m_direction;
 
-
-
 };
-
 
 class Figure
 {
@@ -132,8 +121,6 @@ class Figure
 		FigureCoord rotate(const FigureCoord &coord);
 
 		bool check(const FigureCoord &coord,const QPoint &pt) const;
-		
-		
 			
 
 	public:
@@ -163,31 +150,32 @@ class QGameBoard : public QWidget
 {
 	Q_OBJECT
 
-	enum GameState
+	enum class GameState
 	{
 		stoping,
 		pause,
 		active
 	};
 
-	GameState  state{};
+	GameState  state = GameState::stoping;
 
 public:
 	QGameBoard(QWidget *parent);
 	void AttachPreview(QWidget *preview);
 
 public	slots:
+
 	void NewGame();
 	void Pause();
 	void GameOver();
 
 signals:
+
 	void scoreChangedSignal(int score);
 	void levelChangedSignal(int level);
 	void GameOverSignal();
 
 protected:
-
 
 	void resizeEvent(QResizeEvent *e) override;
 	void paintEvent(QPaintEvent *e) override;
@@ -208,13 +196,13 @@ protected slots:
 
 private:
 
+	bool IsStoped() const;
 	void step(bool down = {});
 	
 	GameField		field;
 	FigureProducer  prod;
 	Figure			figure;
 	GameDrawer      drawer;
-	
 	
 	bool            use{};
 	bool            is_down{};

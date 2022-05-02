@@ -1,10 +1,15 @@
 #ifndef QGAMEBOARD_H
 #define QGAMEBOARD_H
 
-#include <QtWidgets/QFrame>
-#include <QPainterPath>
+#include <Wt/WPaintDevice.h>
+#include <Wt/WPaintedWidget.h>
+#include <Wt/WPen.h>
+#include <Wt/WRectF.h>
+#include <Wt/WPainterPath.h>
+#include <Wt/WWidget.h>
+#include <Wt/WPoint.h>
+#include <Wt/WTimer.h>
 #include <array>
-#include <math.h>
 
 using FigureCoord = std::array<std::array<bool, 4>, 4>;
 
@@ -20,64 +25,57 @@ class Figure ;
 
 class GameDrawer	
 {
-		qreal MaxRadius{};
-        qreal MinRadius{};
-		std::array<QPoint, kColCount * 2>   lines;
-		std::array<std::array<QPainterPath, kColCount>, kRowCount> paths;
-        QRect rect;
-		std::array<qreal, kRowCount + 1>  radius_list;
+		double MaxRadius{};
+        double MinRadius{};
+		std::array<Wt::WLineF, kColCount> lines;
+		std::array<std::array<Wt::WPainterPath, kColCount>, kRowCount> paths;
+		std::array<double, kRowCount + 1>  radius_list;
         void calcul_radius();
         const Figure &m_figure;
         const GameField &m_field;
-        void draw_cell(const QPoint &cell_coord,QPainter *p,const QPen &pen,const QBrush &brush);
-        void draw_field( QPainter *p);
-        void draw_figure(QPainter *p);
+        void draw_cell(const Wt::WPoint &cell_coord,Wt::WPainter *p,const Wt::WPen &pen,const Wt::WBrush &brush);
+        void draw_field( Wt::WPainter *p);
+        void draw_figure(Wt::WPainter *p);
         void fill_path_list();
+	
 public:
-		GameDrawer(const QRect &r,const GameField &fld,const Figure &fg);
-		QPoint ScreenToField(const QPoint &pt) const;
-		void set_rect (const QRect &r);
-		void draw     (QPainter *p, bool is_draw_figure);
-		void draw_preview(QPainter *p, size_t figure_idx, size_t color_idx);
-
+		GameDrawer(const Wt::WRectF &r,const GameField &fld,const Figure &fg);
+		Wt::WPoint ScreenToField(const Wt::WPoint &pt) const;
+		void set_rect(const Wt::WRectF &r);
+		void draw(Wt::WPainter *p, bool is_draw_figure);
+		static void draw_preview(Wt::WPainter *p, size_t figure_idx, size_t color_idx);
+		Wt::WRectF rect;
 };
 
-class GameField: public QObject
+class GameField
 {
-	Q_OBJECT
-
-		std::array<std::array<QColor, kColCount>, kRowCount> field;
+		std::array<std::array<Wt::WColor, kColCount>, kRowCount> field;
         
 		int scores{};
 		int level{};
 
-		void SetCell(const QPoint &cell_coord,const QColor &color);
+		void SetCell(const Wt::WPoint &cell_coord,const Wt::WColor &color);
 		void CheckAll();
 		bool CheckLine(int y) const;
 		void RemoveLine(int line);
         void setScores(int new_scores);
         void setLevel(int new_level);
-	
-		
-    public:
-		void clear();
+    
+public:
 		GameField();
-		bool  CheckCell(const QPoint &cell_coord)		 const;
-		const QColor * GetCell(const QPoint &cell_coord) const;
+		void clear();
+		bool  CheckCell(const Wt::WPoint &cell_coord)		 const;
+		const Wt::WColor *GetCell(const Wt::WPoint &cell_coord) const;
         bool AddFigure(const Figure & fg );
 		bool Rotate(bool cw,const Figure *fg);
-
-      signals:
-		void scoreChangedSignal(int score);
-		void levelChangedSignal (int level);
+		Wt::Signal<int> scoreChangedSignal;
+		Wt::Signal<int> levelChangedSignal;
 
 };
 
 
-class FigureProducer : public QObject
+class FigureProducer : public Wt::WObject
 {
-   Q_OBJECT
-	
 	public:
 		FigureProducer();
 
@@ -89,10 +87,8 @@ class FigureProducer : public QObject
 		}
 		
 		void generate_figure(Figure * ) ;
-        
-	signals:
-         void NewFigureSignal();
-		
+		Wt::Signal<> NewFigureSignal;
+
 	private:
 
 		mutable size_t m_next_figure_idx;
@@ -110,17 +106,17 @@ class Figure
 		FigureCoord m_coord;
 		FigureCoord m_dropped_coord;
 
-		QPoint		cur_pt;
-		QPoint		dropped_pt;
+		Wt::WPoint cur_pt;
+		Wt::WPoint dropped_pt;
 
-		QColor		m_color;
+		Wt::WColor m_color;
 
-		const		GameField			&m_field;
-		const		FigureProducer		&m_prod;	
+		const GameField &m_field;
+		const FigureProducer &m_prod;	
 
 		FigureCoord rotate(const FigureCoord &coord);
 
-		bool check(const FigureCoord &coord,const QPoint &pt) const;
+		bool check(const FigureCoord &coord,const Wt::WPoint &pt) const;
 			
 
 	public:
@@ -129,13 +125,13 @@ class Figure
 
 		bool check_self() const 
 		{
-			return check(m_coord,cur_pt);
+			return check(m_coord, cur_pt);
 		}
         
 		Figure(const GameField &field,const	FigureProducer	&prod);
         
-		void new_figure(const FigureCoord &coord,size_t x, size_t rotate_count,const QColor &color );
-		bool hit_test(const QPoint &pt) const;
+		void new_figure(const FigureCoord &coord,size_t x, size_t rotate_count,const Wt::WColor &color );
+		bool hit_test(const Wt::WPoint &pt) const;
 		bool MoveX(int x,bool cw);
 		bool Droped();
         bool Rotate();
@@ -144,12 +140,18 @@ class Figure
 		bool Down();
 };
 
-
-
-class QGameBoard : public QWidget
+class PreviewWidget : public Wt::WPaintedWidget
 {
-	Q_OBJECT
+		size_t m_figure_idx = 0;
+		size_t m_color_idx = 0;
+		void paintEvent(Wt::WPaintDevice* paintDevice) override;
+	public:
+		void setFigure(size_t figure_idx, size_t color_idx);
 
+};
+
+class QGameBoard : public Wt::WPaintedWidget
+{
 	enum class GameState
 	{
 		stoping,
@@ -160,40 +162,34 @@ class QGameBoard : public QWidget
 	GameState  state = GameState::stoping;
 
 public:
-	QGameBoard(QWidget *parent);
-	void AttachPreview(QWidget *preview);
-
-public	slots:
-
+	QGameBoard();
+	void AttachPreview(PreviewWidget *preview);
 	void NewGame();
 	void Pause();
 	void GameOver();
 
-signals:
-
-	void scoreChangedSignal(int score);
-	void levelChangedSignal(int level);
-	void GameOverSignal();
+	Wt::Signal<int> scoreChangedSignal;
+	Wt::Signal<int> levelChangedSignal;
+	Wt::Signal<> GameOverSignal;
 
 protected:
 
-	void resizeEvent(QResizeEvent *e) override;
-	void paintEvent(QPaintEvent *e) override;
-	void keyPressEvent(QKeyEvent *e) override;
-	void timerEvent(QTimerEvent *event) override;
-
-	void wheelEvent(QWheelEvent *)override;
-	void mousePressEvent(QMouseEvent*)override;
-	void mouseDoubleClickEvent(QMouseEvent *event)override;
-	void mouseMoveEvent(QMouseEvent *event)override;
-	void mouseReleaseEvent(QMouseEvent *event)override;
-	bool eventFilter(QObject *obj, QEvent *event)override;
-
-protected slots:
+	void paintEvent(Wt::WPaintDevice* paintDevice) override;
+	void keyPressEvent(const Wt::WKeyEvent &e);
+	void timerEvent() ;
+	void wheelEvent(const Wt::WMouseEvent&);
+	void mousePressEvent(const Wt::WMouseEvent&);
+	void mouseDoubleClickEvent(const Wt::WMouseEvent&);
+	void mouseMoveEvent(const Wt::WMouseEvent&);
+	void mouseReleaseEvent(const Wt::WMouseEvent&);
 	void ChangLevel(int level);
 	void NewFigure();
 
-
+	void resize(const Wt::WLength& width, const Wt::WLength& height) override
+	{
+		Wt::WPaintedWidget::resize(width, height);
+		drawer.set_rect(Wt::WRectF(0.0, 0.0, width.value() ,height.value()));
+	}
 private:
 
 	bool IsStoped() const;
@@ -206,11 +202,12 @@ private:
 	
 	bool            use{};
 	bool            is_down{};
-	QPoint			sel_coord;
+	Wt::WPoint		sel_coord;
 	int				timer_id{};
 	int				speed{};
 
-	QWidget *m_preview{};
+	PreviewWidget *m_preview{};
+	Wt::WTimer  timer;
 
 };
 

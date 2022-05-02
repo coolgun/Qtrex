@@ -1,26 +1,15 @@
 #ifndef MAINWND_H
 #define MAINWND_H
+#include <Wt/WContainerWidget.h>
 
-#include <QtWidgets/QWidget>
-
-class QGameBoard;
-
-namespace Ui {
-    class MainWnd;
-}
-
-class MainWnd : public QWidget {
-    Q_OBJECT
+class MainWnd : public Wt::WContainerWidget
+{
+    void setupUi();
 public:
-    MainWnd(QWidget *parent = {});
-    ~MainWnd();
+    MainWnd();
 
 private:
-	
-	Ui::MainWnd *ui;
-	QGameBoard	* board;
-
-
+    class QGameBoard* board;
 
 };
 

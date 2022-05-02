@@ -1,37 +1,34 @@
 #include "qgameboard.h"
-#include <QPainter>
-#include <QResizeEvent>
-#include <QtMath>
-#include <QRandomGenerator>
-#include <QTime>
-#include <QDebug>
+#include "Wt/WPainter.h"
+#include <random>
 
 
 namespace
 {
-	bool IsNull(const QColor& color)
+	bool IsNull(const Wt::WColor& color)
 	{
-		return color == Qt::white;
+		return color == Wt::StandardColor::White;
 	};
-
 
 	size_t myrand(size_t bound)
 	{
-		return QRandomGenerator::global()->bounded(static_cast<quint32>(bound));
+		static std::random_device rd;
+		std::uniform_int_distribution<size_t> dist(0, bound -  1);
+		return dist(rd);
 	}
 
-	const std::array<QColor, 6>  color_map =
+	const std::array<Wt::WColor, 6>  color_map =
 	{
-		Qt::red,
-		Qt::blue,
-		Qt::green,
-		Qt::yellow,
-		Qt::magenta,
-		Qt::cyan
-
+		Wt::StandardColor::Red,
+		Wt::StandardColor::Blue,
+		Wt::StandardColor::Green,
+		Wt::StandardColor::Yellow,
+		Wt::StandardColor::Magenta,
+		Wt::StandardColor::Cyan
 	};
 
-	constexpr qreal	coeff = 5.0;
+	constexpr double coeff = 5.0;
+	constexpr double M_1_PI = 0.318309886183790671538;
 
 	const std::array<FigureCoord, 6> FigureCoords =
 	{
@@ -99,7 +96,7 @@ namespace
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void GameDrawer::draw(QPainter* p, bool is_draw_figure)
+void GameDrawer::draw(Wt::WPainter* p, bool is_draw_figure)
 {
 	draw_field(p);
 
@@ -111,11 +108,12 @@ void GameDrawer::draw(QPainter* p, bool is_draw_figure)
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-QPoint GameDrawer::ScreenToField(const QPoint& pt) const
+Wt::WPoint GameDrawer::ScreenToField(const Wt::WPoint& pt) const
 {
-	const auto  delta = pt - rect.center();
-	const qreal r = sqrt(static_cast<qreal>(delta.x() * delta.x() + delta.y() * delta.y()));
-	const qreal angle = atan2(static_cast<qreal>(delta.y()), -delta.x()) / (2 * M_PI) + 0.5;
+	const auto center = rect.center();
+	const Wt::WPoint  delta(pt.x() - std::round(center.x()), pt.y() - std::round(center.y()));
+	const double r =  std::hypot(static_cast<double>(delta.x()), delta.y());
+	const double angle = atan2(static_cast<double>(delta.y()), -delta.x()) / (2 * std::_Pi) + 0.5;
 
 	int x = (angle * kColCount + 0.5);
 	x %= kColCount;
@@ -142,7 +140,7 @@ QPoint GameDrawer::ScreenToField(const QPoint& pt) const
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-GameDrawer::GameDrawer(const QRect& r, const GameField& fld, const Figure& fg) :
+GameDrawer::GameDrawer(const Wt::WRectF& r, const GameField& fld, const Figure& fg) :
 	m_field(fld),
 	m_figure(fg)
 {
@@ -152,10 +150,10 @@ GameDrawer::GameDrawer(const QRect& r, const GameField& fld, const Figure& fg) :
 //----------------------------------------------------------------------------------------------------------------------------------------
 void GameDrawer::calcul_radius()
 {
-	MaxRadius = qMin(rect.width(), rect.height()) * 0.5 - 5;
+	MaxRadius = std::min(rect.width(), rect.height()) * 0.5 - 5;
 	MinRadius = MaxRadius / coeff;
 
-	const qreal step = 1.0 * (MaxRadius - MinRadius) / kRowCount;
+	const double step = 1.0 * (MaxRadius - MinRadius) / kRowCount;
 
 	for (int i = 0; i <= kRowCount; ++i)
 	{
@@ -169,43 +167,60 @@ void GameDrawer::fill_path_list()
 {
 	for (int x = 0; x < kColCount; ++x)
 	{
-		const qreal angle = 2 * M_PI * ((x - 0.5) / kColCount);
-		const qreal sweep_angle = 2 * M_PI / kColCount;
-		const qreal c1 = cos(angle);
-		const qreal s1 = sin(-angle);
-		const qreal c2 = cos(-angle - sweep_angle);
-		const qreal s2 = sin(-angle - sweep_angle);
+		const double angle = 2 * std::_Pi * ((x - 0.5) / kColCount);
+		const double sweep_angle = 2 * std::_Pi / kColCount;
+		const double c1 = cos(angle);
+		const double s1 = sin(-angle);
+		const double c2 = cos(-angle - sweep_angle);
+		const double s2 = sin(-angle - sweep_angle);
 
-		lines[2 * x] = QPoint(radius_list[0] * c1, radius_list[0] * s1) + rect.center();
-		lines[2 * x + 1] = QPoint(radius_list[kRowCount] * c1, radius_list[kRowCount] * s1) + rect.center();
+		const auto center = rect.center();
+
+		lines[x] =
+		{
+			radius_list[0] * c1 + center.x(),
+			radius_list[0] * s1 + center.y(),
+			radius_list[kRowCount] * c1 + center.x(),
+			radius_list[kRowCount] * s1 + +center.y()
+		};
 
 		for (int y = 0; y < kRowCount; ++y)
 		{
 			const auto r1 = radius_list[y];
 			const auto r2 = radius_list[y + 1];
-			const auto x1 = r1 * c1 + rect.center().x();
-			const auto y1 = r1 * s1 + rect.center().y();
-			const auto x2 = r2 * c1 + rect.center().x();
-			const auto y2 = r2 * s1 + rect.center().y();
-			const auto x3 = r1 * c2 + rect.center().x();
-			const auto y3 = r1 * s2 + rect.center().y();
-			QPainterPath path;
+			const auto x1 = r1 * c1 + center.x();
+			const auto y1 = r1 * s1 + center.y();
+			const auto x2 = r2 * c1 + center.x();
+			const auto y2 = r2 * s1 + center.y();
+			const auto x3 = r1 * c2 + center.x();
+			const auto y3 = r1 * s2 + center.y();
+			Wt::WPainterPath path;
 
 			path.moveTo(x1, y1);
 			path.lineTo(x2, y2);
-			path.arcTo(rect.center().x() - r2, rect.center().y() - r2, 2 * r2, 2 * r2, 180 * angle * M_1_PI, 180 * sweep_angle * M_1_PI);
+			path.arcTo(
+				center.x(), 
+				center.y(),  
+				r2, 
+				180 * angle * M_1_PI,
+				180 * sweep_angle * M_1_PI);
 
 			path.lineTo(x3, y3);
 
-			path.arcTo(rect.center().x() - r1, rect.center().y() - r1, 2 * r1, 2 * r1, 180 * (angle + sweep_angle) * M_1_PI, -180 * sweep_angle * M_1_PI);
-			paths[y][x] = path.simplified();
+			path.arcTo(
+				center.x(),
+				center.y(),
+				r1, 
+				180 * (angle + sweep_angle) * M_1_PI,
+				-180 * sweep_angle * M_1_PI);
+			paths[y][x] = path;
 		}
 	}
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void GameDrawer::draw_cell(const QPoint& cell_coord, QPainter* p, const QPen& pen, const QBrush& brush)
+void GameDrawer::draw_cell(const Wt::WPoint& cell_coord, Wt::WPainter* p, const Wt::WPen& pen, const Wt::WBrush& brush)
 {
 
 	if (cell_coord.y() >= kRowCount || cell_coord.y() < 0) return;
@@ -221,29 +236,29 @@ void GameDrawer::draw_cell(const QPoint& cell_coord, QPainter* p, const QPen& pe
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void GameDrawer::draw_field(QPainter* p)
+void GameDrawer::draw_field(Wt::WPainter* p)
 {
-	QPen pen(Qt::gray);
-	QBrush brush;
+	Wt::WPen pen(Wt::StandardColor::Gray);
+	Wt::WBrush brush;
 	p->setPen(pen);
 	p->drawLines(lines.data(), kColCount);
 
 	for (int y = 0; y <= kRowCount; ++y)
 	{
-		int r = qRound(radius_list[y]);
-		p->drawEllipse(rect.center(), r, r);
+		int r = std::round(radius_list[y]);
+		p->drawEllipse(rect.center().x() - r, rect.center().y() -r , 2*r, 2*r);
 	}
 
 	for (int y = 0; y < kRowCount; ++y)
 	{
 		for (int x = 0; x < kColCount; ++x)
 		{
-			QPoint pt(x, y);
+			Wt::WPoint pt(x, y);
 			if (!m_field.CheckCell(pt)) continue;
 
 			const auto  color = *m_field.GetCell(pt);
 			brush.setColor(color);
-			brush.setStyle(!m_field.CheckCell(pt) ? Qt::NoBrush : Qt::SolidPattern);
+			brush.setStyle(!m_field.CheckCell(pt) ? Wt::BrushStyle::None : Wt::BrushStyle::Solid);
 			draw_cell(pt, p, pen, brush);
 		}
 	}
@@ -251,9 +266,26 @@ void GameDrawer::draw_field(QPainter* p)
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void GameDrawer::draw_preview(QPainter* p, size_t figure_idx, size_t color_idx)
+void PreviewWidget::paintEvent(Wt::WPaintDevice* paintDevice) 
 {
-	p->setBrush(QBrush(color_map[color_idx]));
+	Wt::WPainter p(paintDevice);
+	GameDrawer::draw_preview(&p, m_figure_idx, m_color_idx);
+}
+
+//----------------------------------------------------------------------------------------------------------------------------------------
+
+void PreviewWidget::setFigure(size_t figure_idx, size_t color_idx)
+{
+	m_figure_idx = figure_idx;
+	m_color_idx = color_idx;
+	update();
+}
+
+//----------------------------------------------------------------------------------------------------------------------------------------
+
+void GameDrawer::draw_preview(Wt::WPainter* p, size_t figure_idx, size_t color_idx)
+{
+	p->setBrush(Wt::WBrush(color_map[color_idx]));
 	for (int y = 0; y < 4; ++y)
 	{
 		for (int x = 0; x < 4; ++x)
@@ -269,13 +301,13 @@ void GameDrawer::draw_preview(QPainter* p, size_t figure_idx, size_t color_idx)
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void GameDrawer::draw_figure(QPainter* p)
+void GameDrawer::draw_figure(Wt::WPainter* p)
 {
 	int min_x = 1000;
 	int max_x{};
 
 
-	QPen pen(Qt::black);
+	Wt::WPen pen(Wt::StandardColor::Black);
 
 	int min_ys[4];
 	int width = 0;
@@ -289,20 +321,19 @@ void GameDrawer::draw_figure(QPainter* p)
 
 			if (m_figure.m_coord[y][x])
 			{
-				int xx = m_figure.cur_pt.x() + x + kColCount;
-				int yy = m_figure.cur_pt.y() - y;
-				draw_cell({ xx,yy }, p, pen, QBrush(m_figure.m_color));
-				min_x = qMin(min_x, xx);
-				max_x = qMax(max_x, xx);
-				min_y = qMin(min_y, yy);
+				const int xx = m_figure.cur_pt.x() + x + kColCount;
+				const int yy = m_figure.cur_pt.y() - y;
+				draw_cell({ xx,yy }, p, pen, Wt::WBrush(m_figure.m_color));
+				min_x = std::min(min_x, xx);
+				max_x = std::max(max_x, xx);
+				min_y = std::min(min_y, yy);
 			}
 
 			if (m_figure.m_dropped_coord[y][x])
 			{
-				int xx = m_figure.dropped_pt.x() + x + kColCount;
-				int yy = m_figure.dropped_pt.y() - y;
-				draw_cell({ xx,yy }, p, pen, QBrush(Qt::NoBrush));
-
+				const int xx = m_figure.dropped_pt.x() + x + kColCount;
+				const int yy = m_figure.dropped_pt.y() - y;
+				draw_cell({ xx,yy }, p, pen, Wt::WBrush(Wt::BrushStyle::None));
 			}
 
 		}
@@ -314,9 +345,9 @@ void GameDrawer::draw_figure(QPainter* p)
 
 	}
 
-	QBrush brush(QColor(128, 0, 0, 50));
+	Wt::WBrush brush(Wt::WColor(128, 0, 0, 50));
 
-	pen.setStyle(Qt::NoPen);
+	pen.setStyle(Wt::PenStyle::None);
 
 	int idx = 0;
 	if (!width) return;
@@ -333,7 +364,7 @@ void GameDrawer::draw_figure(QPainter* p)
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void GameDrawer::set_rect(const QRect& r)
+void GameDrawer::set_rect(const Wt::WRectF& r)
 {
 	rect = r;
 	calcul_radius();
@@ -346,7 +377,7 @@ void GameDrawer::set_rect(const QRect& r)
 void GameField::setLevel(int new_level)
 {
 	level = new_level;
-	emit levelChangedSignal(level);
+	levelChangedSignal.emit(level);
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------
@@ -355,7 +386,7 @@ void GameField::setScores(int new_scores)
 {
 	if (scores / 100 < new_scores / 100)      setLevel(level + 1);
 	scores = new_scores;
-	emit scoreChangedSignal(scores);
+	scoreChangedSignal.emit(scores);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------
@@ -366,7 +397,7 @@ void GameField::clear()
 	for (int y = 0; y < kRowCount; ++y)
 	{
 		for (int x = 0; x < kColCount; ++x)
-			field[y][x] = Qt::white;
+			field[y][x] = Wt::StandardColor::White;
 	}
 
 	setScores(0);
@@ -424,7 +455,7 @@ bool GameField::Rotate(bool cw, const Figure* fg)
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-bool  GameField::CheckCell(const QPoint& cell_coord) const
+bool  GameField::CheckCell(const Wt::WPoint& cell_coord) const
 {
 	if (cell_coord.y() >= kRowCount) return {};
 
@@ -435,14 +466,14 @@ bool  GameField::CheckCell(const QPoint& cell_coord) const
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-const QColor* GameField::GetCell(const QPoint& cell_coord) const
+const Wt::WColor* GameField::GetCell(const Wt::WPoint& cell_coord) const
 {
 	if (cell_coord.y() >= kRowCount) return nullptr;
 	return &field[cell_coord.y()][cell_coord.x() % kColCount];
 }
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void  GameField::SetCell(const QPoint& cell_coord, const QColor& color)
+void  GameField::SetCell(const Wt::WPoint& cell_coord, const Wt::WColor& color)
 {
 	if (cell_coord.y() >= kRowCount) return;
 
@@ -501,7 +532,8 @@ bool GameField::AddFigure(const Figure& fg)
 		{
 			if (fg.m_coord[y][x])
 			{
-				const auto pt = fg.cur_pt + QPoint(x, -y);
+				auto pt = fg.cur_pt;
+				pt += Wt::WPoint(x, -y);
 				game_over = game_over || pt.y() >= kRowCount;
 				SetCell(pt, fg.m_color);
 			}
@@ -554,7 +586,7 @@ void FigureProducer::generate_figure(Figure* fg)
 	m_next_figure_idx = myrand(FigureCoords.size());
 	m_next_figure_color = myrand(color_map.size());
 	m_direction = myrand(4);
-	emit NewFigureSignal();
+	NewFigureSignal.emit();
 }
 
 
@@ -564,7 +596,7 @@ void FigureProducer::generate_figure(Figure* fg)
 /*
 /************************************************************************************************************************************************/
 
-bool Figure::hit_test(const QPoint& test) const
+bool Figure::hit_test(const Wt::WPoint& test) const
 {
 	for (int y = 0; y < 4; ++y)
 	{
@@ -574,7 +606,7 @@ bool Figure::hit_test(const QPoint& test) const
 
 			if (m_coord[y][x])
 			{
-				const QPoint pt(
+				const Wt::WPoint pt(
 					(cur_pt.x() + x) % kColCount,
 					cur_pt.y() - y
 				);
@@ -617,7 +649,7 @@ FigureCoord Figure::rotate(const FigureCoord& coord)
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-bool Figure::check(const FigureCoord& coord, const QPoint& pt) const
+bool Figure::check(const FigureCoord& coord, const Wt::WPoint& pt) const
 {
 
 	for (int y = 0; y < 4; ++y)
@@ -626,7 +658,7 @@ bool Figure::check(const FigureCoord& coord, const QPoint& pt) const
 		{
 			if (coord[y][x])
 			{
-				if (m_field.CheckCell(pt + QPoint(x, -y))) return {};
+				if (m_field.CheckCell({ pt.x() + x, pt.y() - y })) return {};
 			}
 		}
 	}
@@ -642,9 +674,9 @@ void Figure::calcul_dropped()
 
 	dropped_pt = cur_pt;
 
-	while (check(m_dropped_coord, dropped_pt + QPoint(0, -1)))
+	while (check(m_dropped_coord, { dropped_pt.x(),  dropped_pt.y() - 1 }))
 	{
-		dropped_pt = dropped_pt + QPoint(0, -1);
+		dropped_pt += Wt::WPoint(0, -1);
 	}
 
 }
@@ -669,13 +701,9 @@ bool Figure::Rotate()
 bool Figure::MoveX(int x, bool)
 {
 	const auto xx = (x + kColCount) % kColCount;
-
 	if (!check(m_coord, { xx, cur_pt.y() })) return {};
-
 	cur_pt = { xx % kColCount,cur_pt.y() };
-
 	calcul_dropped();
-
 	return true;
 }
 
@@ -683,10 +711,8 @@ bool Figure::MoveX(int x, bool)
 
 bool Figure::Left()
 {
-	if (!check(m_coord, cur_pt + QPoint(-1, 0))) return {};
-
-	cur_pt = { (cur_pt.x() + kColCount - 1) % kColCount,cur_pt.y() };
-
+	if (!check(m_coord, { (cur_pt.x() + kColCount - 1) % kColCount, cur_pt.y() })) return {};
+	cur_pt = { (cur_pt.x() + kColCount - 1) % kColCount, cur_pt.y() };
 	calcul_dropped();
 	return true;
 }
@@ -695,7 +721,7 @@ bool Figure::Left()
 
 bool Figure::Right()
 {
-	if (!check(m_coord, cur_pt + QPoint(+1, 0))) return {};
+	if (!check(m_coord, { cur_pt.x() + 1, cur_pt.y() })) return {};
 	cur_pt = { (cur_pt.x() + 1) % kColCount,cur_pt.y() };
 	calcul_dropped();
 	return true;
@@ -713,24 +739,23 @@ bool Figure::Droped()
 
 bool Figure::Down()
 {
-
-	if (!check(m_coord, cur_pt + QPoint(0, -1)))
+	const Wt::WPoint test(cur_pt.x(), cur_pt.y() - 1);
+	if (!check(m_coord, test))
 	{
 		return {};
 	}
 
-	cur_pt = cur_pt + QPoint(0, -1);
+	cur_pt = test;
 	calcul_dropped();
-
 	return true;
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void Figure::new_figure(const FigureCoord& coord, size_t x, size_t rotate_count, const QColor& color)
+void Figure::new_figure(const FigureCoord& coord, size_t x, size_t rotate_count, const Wt::WColor& color)
 {
 	m_color = color;
-	cur_pt = QPoint(x % kColCount, kRowCount + 1);
+	cur_pt = Wt::WPoint(x % kColCount, kRowCount + 1);
 	m_coord = coord;
 
 	for (int i = 1; i <= rotate_count % 4; ++i)
@@ -747,56 +772,51 @@ void QGameBoard::NewFigure()
 {
 
 	if (m_preview)
-		m_preview->repaint();
+		m_preview->update();
 
 	step(true);
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void QGameBoard::AttachPreview(QWidget* preview)
+void QGameBoard::AttachPreview(PreviewWidget *preview)
 {
 	m_preview = preview;
-	m_preview->installEventFilter(this);
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-bool QGameBoard::eventFilter(QObject* obj, QEvent* event)
-{
-	if (event->type() == QEvent::Paint)
-	{
-
-		QPainter p(m_preview);
-		drawer.draw_preview(&p, prod.NextFigure(), prod.NextFigureColor());
-		return false;
-	}
-	return QObject::eventFilter(obj, event);
-}
-
-//----------------------------------------------------------------------------------------------------------------------------------------
-QGameBoard::QGameBoard(QWidget* parent) :
-	QWidget(parent),
+QGameBoard::QGameBoard() :
 	figure(field, prod),
-	drawer(rect(), field, figure)
+	drawer({}, field, figure)
 {
-	setFocusPolicy(Qt::StrongFocus);
-	connect(&field, &GameField::scoreChangedSignal, this, &QGameBoard::scoreChangedSignal);
-	connect(&field, &GameField::levelChangedSignal, this, &QGameBoard::ChangLevel);
-	connect(&prod, &FigureProducer::NewFigureSignal, this, &QGameBoard::NewFigure);
+	setCanReceiveFocus(true);
+	//setFocusPolicy(Qt::StrongFocus);
+	mouseWentDown().connect(this, &QGameBoard::mousePressEvent);
+	mouseWentUp().connect(this, &QGameBoard::mouseReleaseEvent);
+	mouseMoved().connect(this, &QGameBoard::mouseMoveEvent);
+	doubleClicked().connect(this, &QGameBoard::mouseDoubleClickEvent);
+	mouseWheel().connect(this, &QGameBoard::wheelEvent);
+	keyWentDown().connect(this, &QGameBoard::keyPressEvent);
+	field.scoreChangedSignal.connect([this](int value) { scoreChangedSignal.emit(value);});
+	field.levelChangedSignal.connect(this, &QGameBoard::ChangLevel);
+	prod.NewFigureSignal.connect(this, &QGameBoard::NewFigure);
+
+	timer.timeout().connect(this, &QGameBoard::timerEvent);
 }
 
 //-------------------------------------------------------------------------------------------------------------
 
 void QGameBoard::NewGame()
 {
-	killTimer(timer_id);
+	timer.stop();
 	field.clear();
 	state = GameState::active;
 	prod.generate_figure(&figure);
 	update();
 	speed = 1000;
-	timer_id = startTimer(speed);
+	timer.setInterval(std::chrono::milliseconds(speed));
+	timer.start();
 }
 
 //-------------------------------------------------------------------------------------------------------------
@@ -804,26 +824,26 @@ void QGameBoard::NewGame()
 void QGameBoard::GameOver()
 {
 	state = GameState::stoping;
-	killTimer(timer_id);
-	emit GameOverSignal();
+	timer.stop();
+	GameOverSignal.emit();
 }
 
 //-------------------------------------------------------------------------------------------------------------
 
 void QGameBoard::Pause()
 {
-	if (state == GameState::stoping) return;
+	if (IsStoped()) return;
 
 	if (state == GameState::active)
 	{
 		state = GameState::pause;
-		killTimer(timer_id);
+		timer.stop();
 	}
 	else
 	{
 		state = GameState::active;
-		timer_id = startTimer(speed);
-
+		timer.setInterval(std::chrono::milliseconds(speed));
+		timer.start();
 	}
 	update();
 }
@@ -834,51 +854,42 @@ void QGameBoard::ChangLevel(int level)
 {
 	speed = 2000 / (1 + level);
 
-	killTimer(timer_id);
-	timer_id = startTimer(speed);
+	timer.stop();
+	timer.setInterval(std::chrono::milliseconds(speed));
+	timer.start();
 	update();
-	emit levelChangedSignal(level);
+	levelChangedSignal.emit(level);
 }
 
-//-------------------------------------------------------------------------------------------------------------
-
-void QGameBoard::resizeEvent(QResizeEvent*)
-{
-	drawer.set_rect(rect());
-}
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void QGameBoard::paintEvent(QPaintEvent*)
+void QGameBoard::paintEvent(Wt::WPaintDevice* paintDevice)
 {
-	QPainter p(this);
-	p.setRenderHint(QPainter::Antialiasing);
-	drawer.draw(&p, state != GameState::stoping);
+	drawer.set_rect(Wt::WRectF(0.0, 0.0, 500, 500));
+	if(m_preview)
+		m_preview->setFigure(prod.NextFigure(), prod.NextFigureColor());
+	Wt::WPainter p(paintDevice);
+	drawer.draw(&p, !IsStoped());
 
-	QPen  pen(Qt::black);
+	Wt::WPen  pen(Wt::StandardColor::Black);
 	p.setPen(pen);
 
-	if (state == GameState::stoping)
+	if (IsStoped())
 	{
-		p.drawText(rect(), Qt::AlignCenter, QString("Game Over"));
+		p.drawText(drawer.rect, Wt::AlignmentFlag::Center | Wt::AlignmentFlag::Middle, Wt::WString("Game Over"));
 	}
 	else if (state == GameState::pause)
 	{
-		p.drawText(rect(), Qt::AlignCenter, QString("Pause"));
+		p.drawText(drawer.rect, Wt::AlignmentFlag::Center | Wt::AlignmentFlag::Middle, Wt::WString("Pause"));
 	}
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void  QGameBoard::timerEvent(QTimerEvent* e)
+void  QGameBoard::timerEvent()
 {
-	if (e->timerId() == timer_id)
-	{
-		step(true);
-	}
-	else
-		QWidget::timerEvent(e);
-
+	step(true);
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------
@@ -904,9 +915,7 @@ void QGameBoard::step(bool down)
 				prod.generate_figure(&figure);
 			else
 				GameOver();
-
 		}
-
 	}
 
 	figure.calcul_dropped();
@@ -915,35 +924,36 @@ void QGameBoard::step(bool down)
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void QGameBoard::wheelEvent(QWheelEvent* e)
+void QGameBoard::wheelEvent(const Wt::WMouseEvent& e)
 {
 	if (IsStoped()) return;
 
-	field.Rotate(e->delta() > 0, &figure);
+	field.Rotate(e.wheelDelta() > 0, &figure);
 
 	step();
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void QGameBoard::mouseDoubleClickEvent(QMouseEvent*)
+void QGameBoard::mouseDoubleClickEvent(const Wt::WMouseEvent& e)
 {
 	if (IsStoped()) return;
 
 	figure.Droped();
+
 	step();
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void QGameBoard::mousePressEvent(QMouseEvent* event)
+void QGameBoard::mousePressEvent(const Wt::WMouseEvent& e)
 {
 	if (IsStoped()) return;
 
-	if (event->button() == Qt::LeftButton)
+	if (e.button() == Wt::MouseButton::Left)
 	{
-		grabMouse();
-		sel_coord = drawer.ScreenToField(event->pos());
+		const auto pt = e.widget();
+		sel_coord = drawer.ScreenToField({ pt.x, pt.y });
 		is_down = true;
 		figure.MoveX(sel_coord.x() - 2, {});
 		step();
@@ -957,13 +967,14 @@ void QGameBoard::mousePressEvent(QMouseEvent* event)
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void QGameBoard::mouseMoveEvent(QMouseEvent* event)
+void QGameBoard::mouseMoveEvent(const Wt::WMouseEvent& e)
 {
 	if (IsStoped()) return;
 
-	if ((event->buttons() & Qt::LeftButton) && is_down)
+	if ((e.button() == Wt::MouseButton::Left) && is_down)
 	{
-		sel_coord = drawer.ScreenToField(event->pos());
+		const auto pt = e.widget();
+		sel_coord = drawer.ScreenToField({ pt.x, pt.y });
 		figure.MoveX(sel_coord.x() - 2, {});
 		step();
 	}
@@ -971,93 +982,86 @@ void QGameBoard::mouseMoveEvent(QMouseEvent* event)
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void QGameBoard::mouseReleaseEvent(QMouseEvent* event)
+void QGameBoard::mouseReleaseEvent(const Wt::WMouseEvent& e)
 {
 	if (IsStoped()) return;
 
-	if (event->button() == Qt::LeftButton && is_down)
+	if ((e.button() == Wt::MouseButton::Left) && is_down)
 	{
-		releaseMouse();
-
-		is_down = {};
-
+		is_down = false;
 	}
 }
 
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 
-void QGameBoard::keyPressEvent(QKeyEvent* e)
+void QGameBoard::keyPressEvent(const Wt::WKeyEvent& e)
 {
-	if (IsStoped() || (state == GameState::pause && e->key() != Qt::Key_P))
+ 	if (IsStoped() || (state == GameState::pause && e.key() != Wt::Key::P))
 	{
-		QWidget::keyPressEvent(e);
 		return;
 	}
 
-	switch (e->key())
+	switch (e.key())
 	{
 	
-		case Qt::Key_Left:
+		case Wt::Key::Left:
 		{
 			figure.Right();
 			step();
 
 		}; break;
 
-		case Qt::Key_Right:
+		case Wt::Key::Right:
 		{
 			figure.Left();
 			step();
 
 		}; break;
 
-		case Qt::Key_Up:
+		case Wt::Key::Up:
 		{
 			figure.Rotate();
 			step();
 
 		}; break;
 
-		case Qt::Key_Space:
+		case Wt::Key::Space:
 		{
 			figure.Droped();
 			step();
 
 		}; break;
 
-		case Qt::Key_Down:
+		case Wt::Key::Down:
 		{
 			step(true);
 		}; break;
 
-		case Qt::Key_P:
+		case Wt::Key::P:
 		{
 			Pause();
 		}; break;
 
-		case Qt::Key_D:
+		case Wt::Key::D:
 		{
 			field.Rotate(true, &figure);
 			step();
 
 		}; break;
 
-		case Qt::Key_A:
+		case Wt::Key::A:
 		{
 			field.Rotate(false, &figure);
 			step();
 
 		}; break;
 
-		case Qt::Key_N:
+		case Wt::Key::N:
 		{
 			NewGame();
 
 		}; break;
-
-		default:
-			QWidget::keyPressEvent(e);
 	};
 }
 
